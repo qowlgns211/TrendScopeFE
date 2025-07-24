@@ -7,7 +7,7 @@ import CommentFeed from "../components/CommentFeed";
 import CommentInput from "../components/CommentInput";
 import SentimentChart from "../components/SentimentChart";
 
-// ✅ 실시간 시간 업데이트 함수
+// 실시간 시간 업데이트 함수
 const useCurrentTime = () => {
   const [currentTime, setCurrentTime] = useState(dayjs());
   
@@ -22,7 +22,7 @@ const useCurrentTime = () => {
   return currentTime;
 };
 
-// ✅ 카테고리 매핑 (넷플릭스 추가)
+// 카테고리 매핑 
 const CATEGORY_CONFIG = {
   1: { name: 'google', displayName: '구글', icon: '🔍', color: 'bg-blue-500' },
   2: { name: 'netflix', displayName: '넷플릭스', icon: '🎬', color: 'bg-red-500' },
@@ -32,19 +32,19 @@ const CATEGORY_CONFIG = {
 };
 
 const Home = () => {
-  // ✅ 실시간 시간 훅 사용
+  // 실시간 시간 훅 사용
   const currentTime = useCurrentTime();
   const formattedTime = currentTime.format("YYYY년 M월 D일 HH:mm:ss");
   const [lastKeywordUpdate, setLastKeywordUpdate] = useState(null);
 
-  // ✅ 백엔드 연동 상태
+  // 백엔드 연동 상태
   const [keywords, setKeywords] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(1); // 구글이 기본값
   const [comments, setComments] = useState({});
   const [sentimentData, setSentimentData] = useState({});
 
-  // ✅ UI 상태
+  // UI 상태
   const [selectedKeyword, setSelectedKeyword] = useState(null);
   const [hoveredKeyword, setHoveredKeyword] = useState(null);
   const [chartPosition, setChartPosition] = useState({ x: 0, y: 0 });
@@ -52,15 +52,15 @@ const Home = () => {
   const [commentText, setCommentText] = useState("");
   const [allComments, setAllComments] = useState([]);
 
-  // ✅ 추천 중복 방지용 로컬 저장소
+  // 추천 중복 방지용 로컬 저장소
   const [userLikes, setUserLikes] = useState(new Set());
   const [currentUserIP, setCurrentUserIP] = useState('');
 
-  // ✅ 호버 안정화 상태
+  // 호버 안정화 상태
   const [hoverTimeout, setHoverTimeout] = useState(null);
   const [isChartStable, setIsChartStable] = useState(false);
 
-  // ✅ 실제 IP 주소 가져오는 함수
+  // 실제 IP 주소 가져오는 함수
   const getUserIP = async () => {
     try {
       // 여러 IP 서비스를 시도
@@ -91,7 +91,7 @@ const Home = () => {
     }
   };
 
-  // ✅ 카테고리 불러오기
+  // 카테고리 불러오기
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -109,7 +109,7 @@ const Home = () => {
     fetchCategories();
   }, []);
 
-  // ✅ 키워드 불러오기 (5분마다) + 갱신시각 업데이트
+  // 키워드 불러오기 (5분마다) + 갱신시각 업데이트
   useEffect(() => {
     const fetchKeywords = async () => {
       try {
@@ -157,7 +157,7 @@ const Home = () => {
     }
   }, [selectedCategory]);
 
-  // ✅ 실시간 댓글 불러오기
+  // 실시간 댓글 불러오기
   useEffect(() => {
     const fetchAllComments = async () => {
       try {
@@ -202,7 +202,7 @@ const Home = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // ✅ 사용자 추천 이력 로딩 (단순화)
+  // 사용자 추천 이력 로딩 (로컬 스토리지 방식 - comment_likes 테이블 없음)
   useEffect(() => {
     const loadUserLikes = async () => {
       try {
@@ -210,35 +210,35 @@ const Home = () => {
         setCurrentUserIP(userIP);
         console.log("🔍 IP 로딩:", userIP);
         
-        const { data: likes } = await supabase
-          .from("comment_ecommendation")
-          .select("comment_id")
-          .eq("ip_address", userIP);
-
-        if (likes) {
-          const likeSet = new Set(likes.map(like => `${userIP}-${like.comment_id}`));
+        // 로컬 스토리지에서 추천 이력 불러오기
+        const savedLikes = localStorage.getItem(`userLikes_${userIP}`);
+        if (savedLikes) {
+          const likeSet = new Set(JSON.parse(savedLikes));
           setUserLikes(likeSet);
-          console.log("✅ 추천 이력 로딩:", likes.length, "개");
+          console.log("✅ 로컬 추천 이력 로딩:", likeSet.size, "개");
+        } else {
+          setUserLikes(new Set());
         }
       } catch (err) {
         console.warn("추천 이력 로딩 실패:", err);
+        setUserLikes(new Set());
       }
     };
 
     loadUserLikes();
   }, []);
 
-  // ✅ 댓글 저장 함수 (실제 IP 사용)
+  // 댓글 저장 함수 
   const saveCommentToSupabase = async (keywordId, text) => {
     try {
-      const userIP = await getUserIP(); // 실제 IP 가져오기
+      const userIP = await getUserIP(); //IP 가져오기
       
       const { error } = await supabase.from("comment").insert([
         {
           keyword_id: keywordId,
           comment_contents: text,
           nickname: "익명",
-          ip_address: userIP, // 실제 IP 사용
+          ip_address: userIP, 
           comment_recommendation: 0,
         },
       ]);
@@ -249,31 +249,30 @@ const Home = () => {
     }
   };
 
-  // ✅ 댓글 추천 핸들러 (단순하고 확실한 방법)
+  // 댓글 추천 핸들러 (comment_likes 테이블 없는 버전)
   const handleCommentLike = async (commentId) => {
     try {
       const userIP = await getUserIP();
       console.log("🔍 추천 시도:", { userIP, commentId });
       
-      // 단계 1: 중복 확인
-      const { data: existingLike } = await supabase
-        .from("comment_recommendation")
-        .select("*")
-        .eq("comment_id", commentId)
-        .eq("ip_address", userIP)
-        .maybeSingle();
-
-      if (existingLike) {
-        console.log("❌ 이미 추천함");
+      // 로컬 상태로만 중복 확인
+      const localKey = `${userIP}-${commentId}`;
+      if (userLikes.has(localKey)) {
+        console.log("❌ 이미 추천함 (로컬 상태)");
         return;
       }
 
-      // 단계 2: 현재 댓글 정보 가져오기
-      const { data: comment } = await supabase
+      // 현재 댓글 정보 가져오기
+      const { data: comment, error: commentError } = await supabase
         .from("comment")
         .select("comment_recommendation")
         .eq("comment_id", commentId)
         .single();
+
+      if (commentError) {
+        console.error("❌ 댓글 조회 에러:", commentError);
+        return;
+      }
 
       if (!comment) {
         console.log("❌ 댓글 없음");
@@ -283,17 +282,7 @@ const Home = () => {
       const newLikes = (comment.comment_recommendation || 0) + 1;
       console.log("📈 추천 수 증가:", comment.comment_recommendation, "→", newLikes);
 
-      // 단계 3: 추천 이력 추가
-      const { error: insertError } = await supabase
-        .from("comment_recommendation")
-        .insert({ comment_id: commentId, ip_address: userIP });
-
-      if (insertError) {
-        console.error("❌ 추천 이력 저장 실패:", insertError);
-        return;
-      }
-
-      // 단계 4: 추천 수 업데이트
+      // 추천 수 업데이트
       const { error: updateError } = await supabase
         .from("comment")
         .update({ comment_recommendation: newLikes })
@@ -304,8 +293,12 @@ const Home = () => {
         return;
       }
 
-      // 단계 5: UI 업데이트
-      setUserLikes(prev => new Set([...prev, `${userIP}-${commentId}`]));
+      // 로컬 상태와 스토리지 업데이트
+      setUserLikes(prev => {
+        const newSet = new Set([...prev, localKey]);
+        localStorage.setItem(`userLikes_${userIP}`, JSON.stringify([...newSet]));
+        return newSet;
+      });
       
       setAllComments(prev => prev.map(c => 
         c.id === commentId 
@@ -320,7 +313,48 @@ const Home = () => {
     }
   };
 
-  // ✅ 키워드 클릭 핸들러
+  // 댓글 삭제 핸들러 (자신이 쓴 댓글만 삭제 가능)
+  const handleCommentDelete = async (commentId, commentIP) => {
+    try {
+      const userIP = await getUserIP();
+      console.log("🗑️ 댓글 삭제 시도:", { userIP, commentId, commentIP });
+      
+      // 자신이 쓴 댓글인지 확인
+      if (userIP !== commentIP) {
+        alert("자신이 작성한 댓글만 삭제할 수 있습니다.");
+        return;
+      }
+
+      // 삭제 확인
+      if (!confirm("정말로 이 댓글을 삭제하시겠습니까?")) {
+        return;
+      }
+
+      // 댓글 삭제
+      const { error: deleteError } = await supabase
+        .from("comment")
+        .delete()
+        .eq("comment_id", commentId)
+        .eq("ip_address", userIP); // 추가 보안을 위해 IP도 확인
+
+      if (deleteError) {
+        console.error("❌ 댓글 삭제 실패:", deleteError);
+        alert("댓글 삭제에 실패했습니다.");
+        return;
+      }
+
+      // UI에서 댓글 제거
+      setAllComments(prev => prev.filter(comment => comment.id !== commentId));
+      
+      console.log("✅ 댓글 삭제 완료:", commentId);
+      
+    } catch (error) {
+      console.error("❌ 댓글 삭제 전체 실패:", error);
+      alert("댓글 삭제 중 오류가 발생했습니다.");
+    }
+  };
+
+  // 키워드 클릭 핸들러
   const handleKeywordClick = async (keyword) => {
     if (selectedKeyword?.id === keyword.id && showCommentInput) {
       setShowCommentInput(false);
@@ -411,7 +445,7 @@ const Home = () => {
     }
   };
 
-  // ✅ 안정적인 호버 핸들러 (마우스 이동시 차트 안정화)
+  // 안정적인 호버 핸들러 (마우스 이동시 차트 안정화)
   const handleKeywordHover = async (keyword, event) => {
     if (keyword && keyword.sentiment) {
       setHoveredKeyword(keyword);
@@ -527,7 +561,7 @@ const Home = () => {
     setIsChartStable(false);
   };
 
-  // ✅ 댓글 제출 핸들러
+  // 댓글 제출 핸들러
   const handleCommentSubmit = async () => {
     if (!commentText.trim() || !selectedKeyword) return;
 
@@ -595,7 +629,7 @@ const Home = () => {
     }
   };
 
-  // ✅ UI 핸들러들
+  // UI 핸들러들
   const handleCategoryChange = (categoryId) => {
     setSelectedCategory(categoryId);
     setSelectedKeyword(null);
@@ -605,7 +639,7 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
-      {/* ✅ 헤더 - 문구 최종 수정 */}
+      {/* 헤더 */}
       <header className="flex justify-between items-center p-8 pb-6">
         <h1 className="text-xl font-bold">
           갱신된 시각({lastKeywordUpdate || "로딩중..."}) 기준 실시간 검색어
@@ -613,7 +647,7 @@ const Home = () => {
       </header>
 
       <div className="flex">
-        {/* ✅ 좌측 사이드바 - 완전히 중앙으로 */}
+        {/* 좌측 사이드바 */}
         <div className="w-80 p-6 pt-6 space-y-4">
           <div className="bg-gray-700 text-white px-4 py-3 rounded-lg">
             <span className="font-medium">사이트 별 검색어</span>
@@ -637,7 +671,7 @@ const Home = () => {
           </div>
         </div>
 
-        {/* ✅ 중앙 원형 차트 - 완전히 중앙으로 */}
+        {/* 중앙 원형 차트 */}
         <CircleChart
           keywords={keywords}
           selectedKeyword={selectedKeyword}
@@ -646,15 +680,17 @@ const Home = () => {
           onKeywordLeave={handleKeywordLeave}
         />
 
-        {/* ✅ 우측 댓글 피드 */}
+        {/* 우측 댓글 피드 - currentUserIP 전달 */}
         <CommentFeed
           comments={allComments}
           onCommentLike={handleCommentLike}
+          onCommentDelete={handleCommentDelete}
           userLikes={userLikes}
+          currentUserIP={currentUserIP}
         />
       </div>
 
-      {/* ✅ 감정 분석 차트 - 안정화된 버전 */}
+      {/* 감정 분석 차트 */}
       <SentimentChart
         keyword={hoveredKeyword?.text}
         sentiment={hoveredKeyword?.sentiment}
@@ -662,7 +698,7 @@ const Home = () => {
         position={chartPosition}
       />
 
-      {/* ✅ 댓글 입력창 */}
+      {/* 댓글 입력창 */}
       <CommentInput
         isVisible={showCommentInput}
         selectedKeyword={selectedKeyword}
